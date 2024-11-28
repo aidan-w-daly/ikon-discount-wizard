@@ -3,3 +3,6 @@ Thumbs.db
 
 #venv
 .venv
+
+#for hiding sensitive information (email login info) ;)
+src/config.py

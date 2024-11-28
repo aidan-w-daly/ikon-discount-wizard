@@ -1,8 +1,23 @@
+from email.mime.multipart import MIMEMultipart
+import os
 from docx import Document
 import docx
 from docx.enum.text import WD_COLOR_INDEX
 from docx.shared import Pt
 from docx.shared import Inches
+from docx2pdf import convert
+import smtplib
+from email import encoders
+from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+import config
+
+#TODO
+#   [x] Save as pdf instead of docx
+#   [ ] Use passkey (ask Ross) and create app password
+#   [ ] Take sheets / excel as input
+#   [ ] Probably don't need Student class... unless I can automate previous steps - Alterra excel or use google sheets as database XD
 
 
 IKON_PASS_PRICE = 959
@@ -15,12 +30,9 @@ class Student:
         self.last_name = last_name
         self.email = email
         self.ikon_code = ikon_code
-    
-# def populate_template(Student s) -> str:
-#     return f'Hello {s.first_name} {s.last_name},\n\nAs'
 
 #matches google doc exactly BESIDES bullet indent
-def generate_promo_code_draft(s: Student):
+def generate_promo_attatchment(s: Student) -> str:
     document = Document()
     style = document.styles['Normal']
     style.paragraph_format.space_before = Pt(0)
@@ -63,7 +75,10 @@ def generate_promo_code_draft(s: Student):
     p3.add_run(' and the Ikon Pass College Sales Team can help you.  ')
     document.add_paragraph('\n\nThank you!\n\n\n')
 
-    document.save(f'{s.first_name} {s.last_name}.docx')
+    document.save(f'../{s.first_name} {s.last_name}.docx')
+    convert(f'../{s.first_name} {s.last_name}.docx') #converts docx to pdf
+    os.remove(f'../{s.first_name} {s.last_name}.docx')
+    return os.path.abspath(f'../{s.first_name} {s.last_name}.pdf')
 
 # From python-docx github. Why isn't this functionality in the package by default????
 def add_hyperlink(paragraph, url, text, color, underline):
@@ -115,9 +130,43 @@ def add_hyperlink(paragraph, url, text, color, underline):
 
     return hyperlink
 
-    
-def send_email(s: Student):
-    pass
 
+def send_email(student_email: str, attatchment_path: str):
+
+    SENDER = 'skiandsnowboarducr@gmail.com'
+    PASSWORD = config.EMAIL_PASSWORD
+
+    MSG_BODY = 'See the attatched document :)'
+
+    with open(attatchment_path, 'rb') as attachment:
+        # Add the attachment to the message
+        part = MIMEBase("application", "octet-stream")
+        part.set_payload(attachment.read())
+    encoders.encode_base64(part)
+    part.add_header(
+        "Content-Disposition",
+        f"attachment; filename= {os.path.basename(attatchment_path)}",
+    )
+
+    msg = MIMEMultipart()
+    msg['Subject'] = 'IKON CODE'
+    msg['From'] = SENDER
+    msg['To'] = student_email
+    msg.attach(MIMEText(MSG_BODY))
+    msg.attach(part)
+
+    with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp_server:
+        try:
+            smtp_server.login(SENDER, '')
+            smtp_server.sendmail(SENDER, student_email, msg.as_string())
+            print("Message sent!")
+        except:
+            print('ERROR: Email login failed. Is the password correct?')
+    
+    
+
+#testing :P
 me = Student('Aidan', 'Daly', 'aidanwdaly@gmail.com', 'x1x1x1x1x1x1')
-generate_promo_code_draft(me)
+attatchment_path = generate_promo_attatchment(me)
+#send_email(me.email, attatchment_path)
+os.remove(attatchment_path)
